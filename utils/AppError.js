@@ -1,0 +1,13 @@
+/**
+ * Custom application error with status code support.
+ * Used for consistent error handling across the application.
+ */
+export class AppError extends Error {
+  constructor(message, statusCode = 500) {
+    super(message);
+    this.statusCode = statusCode;
+    this.isOperational = true;
+
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
