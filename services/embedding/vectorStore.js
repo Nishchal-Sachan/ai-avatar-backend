@@ -98,8 +98,8 @@ export const mockVectorStore = {
  * Get Pinecone index. Lazy-loaded to avoid errors when env vars are missing.
  */
 async function getPineconeIndex() {
-  const { pineconeIndex } = await import('../../config/pinecone.js');
-  return pineconeIndex;
+  const { getPineconeIndex: getIndex } = await import('../../config/pinecone.js');
+  return getIndex();
 }
 
 /**
