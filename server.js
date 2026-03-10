@@ -7,6 +7,15 @@ const PORT = process.env.PORT || 3000;
 
 let server = null;
 
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection', { reason, stack: reason?.stack });
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception', { error: err.message, stack: err.stack });
+  process.exit(1);
+});
+
 const startServer = async () => {
   await connectDB();
   server = app.listen(PORT, () => {

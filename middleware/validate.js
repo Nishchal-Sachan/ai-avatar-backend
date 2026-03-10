@@ -4,45 +4,50 @@
  * @param {Object} [options] - { stripUnknown?: boolean } - default true for body
  */
 import AppError from "../utils/AppError.js";
+
 export function validate(schemas, options = {}) {
   const stripUnknown = options.stripUnknown !== false;
   return (req, res, next) => {
-    const errors = [];
+    try {
+      const errors = [];
 
-    if (schemas.body) {
-      const { error, value } = schemas.body.validate(req.body || {}, {
-        abortEarly: false,
-        stripUnknown,
-      });
-      if (error) {
-        errors.push(...error.details.map((d) => d.message));
-      } else {
-        req.body = value;
+      if (schemas.body) {
+        const { error, value } = schemas.body.validate(req.body || {}, {
+          abortEarly: false,
+          stripUnknown,
+        });
+        if (error) {
+          errors.push(...error.details.map((d) => d.message));
+        } else {
+          req.body = value;
+        }
       }
-    }
 
-    if (schemas.query) {
-      const { error } = schemas.query.validate(req.query, {
-        abortEarly: false,
-      });
-      if (error) {
-        errors.push(...error.details.map((d) => d.message));
+      if (schemas.query) {
+        const { error } = schemas.query.validate(req.query || {}, {
+          abortEarly: false,
+        });
+        if (error) {
+          errors.push(...error.details.map((d) => d.message));
+        }
       }
-    }
 
-    if (schemas.params) {
-      const { error } = schemas.params.validate(req.params, {
-        abortEarly: false,
-      });
-      if (error) {
-        errors.push(...error.details.map((d) => d.message));
+      if (schemas.params) {
+        const { error } = schemas.params.validate(req.params || {}, {
+          abortEarly: false,
+        });
+        if (error) {
+          errors.push(...error.details.map((d) => d.message));
+        }
       }
-    }
 
-    if (errors.length > 0) {
-      return next(new AppError(errors.join(". "), 400));
-    }
+      if (errors.length > 0) {
+        return next(new AppError(errors.join(". "), 400));
+      }
 
-    next();
+      next();
+    } catch (err) {
+      next(new AppError(err.message || "Validation failed", 400));
+    }
   };
 }
