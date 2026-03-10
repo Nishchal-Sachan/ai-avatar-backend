@@ -14,6 +14,8 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+app.set("trust proxy", 1); // required for Render / reverse proxies
+
 app.use(helmet());
 app.use(corsMiddleware);
 app.use(requestId);
