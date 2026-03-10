@@ -3,6 +3,7 @@
  * @param {Object} schemas - { body?, query?, params? }
  * @param {Object} [options] - { stripUnknown?: boolean } - default true for body
  */
+import AppError from "../utils/AppError.js";
 export function validate(schemas, options = {}) {
   const stripUnknown = options.stripUnknown !== false;
   return (req, res, next) => {
@@ -21,21 +22,25 @@ export function validate(schemas, options = {}) {
     }
 
     if (schemas.query) {
-      const { error } = schemas.query.validate(req.query, { abortEarly: false });
+      const { error } = schemas.query.validate(req.query, {
+        abortEarly: false,
+      });
       if (error) {
         errors.push(...error.details.map((d) => d.message));
       }
     }
 
     if (schemas.params) {
-      const { error } = schemas.params.validate(req.params, { abortEarly: false });
+      const { error } = schemas.params.validate(req.params, {
+        abortEarly: false,
+      });
       if (error) {
         errors.push(...error.details.map((d) => d.message));
       }
     }
 
     if (errors.length > 0) {
-      return next(new AppError(errors.join('. '), 400));
+      return next(new AppError(errors.join(". "), 400));
     }
 
     next();
