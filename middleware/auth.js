@@ -19,18 +19,18 @@ export const protect = async (req, res, next) => {
     }
 
     if (!token) {
-      throw new AppError('Access denied. No token provided.', 401);
+      throw new AppError('Access denied. No token provided.', 401, 'AUTH_REQUIRED');
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const user = await User.findById(decoded.id).select('status');
     if (!user) {
-      throw new AppError('User no longer exists.', 401);
+      throw new AppError('User no longer exists.', 401, 'AUTH_INVALID');
     }
 
     if (user.status === 'suspended') {
-      throw new AppError('Account is suspended.', 403);
+      throw new AppError('Account is suspended.', 403, 'ACCESS_DENIED');
     }
 
     req.user = {
@@ -42,11 +42,11 @@ export const protect = async (req, res, next) => {
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
-      next(new AppError('Invalid token.', 401));
+      next(new AppError('Invalid token.', 401, 'AUTH_INVALID'));
       return;
     }
     if (error.name === 'TokenExpiredError') {
-      next(new AppError('Token expired.', 401));
+      next(new AppError('Token expired.', 401, 'AUTH_EXPIRED'));
       return;
     }
     next(error);
@@ -62,14 +62,11 @@ export const protect = async (req, res, next) => {
  */
 export const authorizeUserType = (...types) => (req, res, next) => {
   if (!req.user) {
-    return next(new AppError('Authentication required.', 401));
+    return next(new AppError('Authentication required.', 401, 'AUTH_REQUIRED'));
   }
 
   if (!types.includes(req.user.userType)) {
-    return res.status(403).json({
-      success: false,
-      message: 'Access denied. Insufficient permissions.',
-    });
+    return next(new AppError('Access denied. Insufficient permissions.', 403, 'ACCESS_DENIED'));
   }
 
   next();
@@ -81,11 +78,11 @@ export const authorizeUserType = (...types) => (req, res, next) => {
  */
 export const authorizeRoles = (...roles) => (req, res, next) => {
   if (!req.user) {
-    return next(new AppError('Authentication required.', 401));
+    return next(new AppError('Authentication required.', 401, 'AUTH_REQUIRED'));
   }
 
   if (!roles.includes(req.user.role)) {
-    return next(new AppError('Access denied. Insufficient permissions.', 403));
+    return next(new AppError('Access denied. Insufficient permissions.', 403, 'ACCESS_DENIED'));
   }
 
   next();

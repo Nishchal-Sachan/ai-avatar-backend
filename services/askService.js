@@ -4,6 +4,7 @@
  * Tracks execution time breakdown, emotion, partial failures.
  */
 
+import { AppError } from '../utils/AppError.js';
 import logger from '../config/logger.js';
 import { transcribe } from './speech.service.js';
 import { detectLanguage, translateToEnglish, translateToTarget } from './translation.service.js';
@@ -55,6 +56,10 @@ export async function executeAskFlow(params) {
     emotionTimeMs: 0,
   };
 
+  if (!text?.trim() && !audioFilePath) {
+    throw new AppError('Either text or audio must be provided', 400, 'VALIDATION_ERROR');
+  }
+
   let question = text?.trim() ?? '';
 
   if (audioFilePath) {
@@ -64,7 +69,7 @@ export async function executeAskFlow(params) {
   }
 
   if (!question) {
-    throw new Error('Question is required. Provide text or audio.');
+    throw new AppError('Either text or audio must be provided', 400, 'VALIDATION_ERROR');
   }
 
   const detectedLang = await detectLanguage(question);

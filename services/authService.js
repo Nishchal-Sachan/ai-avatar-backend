@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { AppError } from '../utils/AppError.js';
 
 /**
  * Register a new user.
@@ -13,16 +14,12 @@ export const registerUser = async (userData) => {
   const { name, email, password, userType = 'viewer', organizationName } = userData;
 
   if (userType === 'creator' && (!organizationName || !organizationName.trim())) {
-    const error = new Error('Organization name is required when user type is creator');
-    error.statusCode = 400;
-    throw error;
+    throw new AppError('Organization name is required when user type is creator', 400, 'VALIDATION_ERROR');
   }
 
   const existingUser = await User.findOne({ email: email.toLowerCase() });
   if (existingUser) {
-    const error = new Error('User already exists with this email');
-    error.statusCode = 409;
-    throw error;
+    throw new AppError('User already exists with this email', 409, 'DUPLICATE_RESOURCE');
   }
 
   const user = await User.create({
@@ -62,22 +59,16 @@ export const loginUser = async (email, password) => {
   const user = await User.findOne({ email: email.toLowerCase() }).select('+password +status');
 
   if (!user) {
-    const error = new Error('Invalid email or password');
-    error.statusCode = 401;
-    throw error;
+    throw new AppError('Invalid email or password', 401, 'AUTH_INVALID');
   }
 
   if (user.status === 'suspended') {
-    const error = new Error('Account is suspended.');
-    error.statusCode = 403;
-    throw error;
+    throw new AppError('Account is suspended.', 403, 'ACCESS_DENIED');
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
-    const error = new Error('Invalid email or password');
-    error.statusCode = 401;
-    throw error;
+    throw new AppError('Invalid email or password', 401, 'AUTH_INVALID');
   }
 
   const token = jwt.sign(

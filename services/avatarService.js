@@ -39,7 +39,7 @@ export async function updateAvatar(avatarId, data, userId) {
   );
 
   if (!avatar) {
-    throw new AppError("Avatar not found or access denied", 404);
+    throw new AppError("Avatar not found", 404, "AVATAR_NOT_FOUND");
   }
 
   return avatar;
@@ -55,7 +55,7 @@ export async function deleteAvatar(avatarId, userId) {
   });
 
   if (!avatar) {
-    throw new AppError("Avatar not found or access denied", 404);
+    throw new AppError("Avatar not found", 404, "AVATAR_NOT_FOUND");
   }
 
   return true;
@@ -71,7 +71,7 @@ export async function deleteAvatar(avatarId, userId) {
  */
 export async function validateDocumentUploadAccess(avatarId, user) {
   if (user.userType !== 'creator') {
-    throw new AppError('Only creators can upload documents.', 403);
+    throw new AppError('Only creators can upload documents.', 403, 'ACCESS_DENIED');
   }
 
   if (!avatarId?.trim()) {
@@ -80,12 +80,12 @@ export async function validateDocumentUploadAccess(avatarId, user) {
 
   const avatar = await Avatar.findById(avatarId.trim());
   if (!avatar) {
-    throw new AppError('Avatar not found.', 404);
+    throw new AppError('Avatar not found.', 404, 'AVATAR_NOT_FOUND');
   }
 
   const isCreator = avatar.createdBy.toString() === user.id.toString();
 
   if (!isCreator) {
-    throw new AppError('Only the avatar creator can upload documents to this avatar.', 403);
+    throw new AppError('Only the avatar creator can upload documents to this avatar.', 403, 'ACCESS_DENIED');
   }
 }

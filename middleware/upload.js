@@ -28,11 +28,11 @@ const storage = multer.diskStorage({
 
 const fileFilter = (req, file, cb) => {
   if (file.mimetype !== ALLOWED_MIME) {
-    return cb(new AppError('Only PDF files are allowed.', 400), false);
+    return cb(new AppError('Only PDF files are allowed.', 415, 'UNSUPPORTED_MEDIA'), false);
   }
   const ext = path.extname(file.originalname || '').toLowerCase();
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
-    return cb(new AppError('Invalid file extension. Only .pdf is allowed.', 400), false);
+    return cb(new AppError('Invalid file extension. Only .pdf is allowed.', 415, 'UNSUPPORTED_MEDIA'), false);
   }
   cb(null, true);
 };
@@ -52,16 +52,16 @@ export const uploadSingle = (fieldName) => (req, res, next) => {
     if (err) {
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
-          return next(new AppError('File size exceeds 5MB limit.', 400));
+          return next(new AppError('File size exceeds 5MB limit.', 400, 'FILE_TOO_LARGE'));
         }
         if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-          return next(new AppError(`Unexpected field: ${err.field}.`, 400));
+          return next(new AppError(`Unexpected field: ${err.field}.`, 400, "VALIDATION_ERROR"));
         }
       }
       return next(err);
     }
     if (!req.file) {
-      return next(new AppError('No file provided. Please upload a PDF file.', 400));
+      return next(new AppError('No file provided. Please upload a PDF file.', 400, "VALIDATION_ERROR"));
     }
     next();
   });
@@ -113,7 +113,7 @@ export const uploadAudioOptional = (fieldName) => (req, res, next) => {
           return next(new AppError('Audio file exceeds 25MB limit.', 400));
         }
         if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-          return next(new AppError(`Unexpected field: ${err.field}.`, 400));
+          return next(new AppError(`Unexpected field: ${err.field}.`, 400, "VALIDATION_ERROR"));
         }
       }
       return next(err);

@@ -42,12 +42,12 @@ export function validate(schemas, options = {}) {
       }
 
       if (errors.length > 0) {
-        return next(new AppError(errors.join(". "), 400));
+        return next(new AppError(errors.join(". "), 400, "VALIDATION_ERROR"));
       }
 
       next();
     } catch (err) {
-      next(new AppError(err.message || "Validation failed", 400));
+      next(new AppError(err.message || "Validation failed", 400, "VALIDATION_ERROR"));
     }
   };
 }

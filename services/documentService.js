@@ -31,8 +31,7 @@ function cleanupFile(filePath) {
  */
 export const uploadDocument = async ({ file, title, avatarId, userId }) => {
   if (!file?.path) {
-    const error = new AppError('No file provided.', 400);
-    throw error;
+    throw new AppError('No file provided.', 400, 'VALIDATION_ERROR');
   }
 
   let extractedTextLength = 0;
@@ -46,11 +45,11 @@ export const uploadDocument = async ({ file, title, avatarId, userId }) => {
     logger.info('Document text extracted', { extractedTextLength });
   } catch (err) {
     cleanupFile(file.path);
-    const error = new AppError(
-      err.message || 'Failed to parse PDF. File may be corrupted or not a valid PDF.',
-      400
+    throw new AppError(
+      'Invalid document format. File may be corrupted or not a valid PDF.',
+      400,
+      'INVALID_DOCUMENT'
     );
-    throw error;
   }
 
   const relativePath = `uploads/${path.basename(file.path)}`;
@@ -100,8 +99,7 @@ export async function deleteDocument(documentId) {
   const document = await Document.findById(documentId);
 
   if (!document) {
-    const error = new AppError('Document not found.', 404);
-    throw error;
+    throw new AppError('Document not found.', 404, 'DOCUMENT_NOT_FOUND');
   }
 
   document.isDeleted = true;
