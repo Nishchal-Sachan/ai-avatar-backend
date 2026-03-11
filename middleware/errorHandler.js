@@ -56,16 +56,31 @@ const errorHandler = (err, req, res, next) => {
     message = "CORS not allowed";
   }
 
-  console.error("API Error:", err);
+  const isClientError = statusCode >= 400 && statusCode < 500;
 
-  logger.error("Request error", {
-    message: err.message,
-    statusCode,
-    code,
-    requestId,
-    path: req.path,
-    stack: err.stack,
-  });
+  if (process.env.NODE_ENV === "production" && isClientError) {
+    delete err.stack;
+  }
+
+  if (statusCode >= 500) {
+    console.error("Server Error:", err);
+    logger.error("Request error", {
+      message: err.message,
+      statusCode,
+      code,
+      requestId,
+      path: req.path,
+      stack: err.stack,
+    });
+  } else {
+    logger.warn("Request completed with client error", {
+      message,
+      statusCode,
+      code,
+      requestId,
+      path: req.path,
+    });
+  }
 
   const response = {
     success: false,
@@ -73,7 +88,7 @@ const errorHandler = (err, req, res, next) => {
       message,
       code,
       requestId,
-      ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
+      ...(process.env.NODE_ENV === "development" && !isClientError && { stack: err.stack }),
     },
   };
 

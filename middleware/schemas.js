@@ -21,14 +21,14 @@ export const registerSchema = {
     password: Joi.string()
       .min(8)
       .max(64)
-      .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).+$/)
+      .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/)
       .required()
       .messages({
         "string.empty": "Password is required",
         "string.min": "Password must be at least 8 characters",
         "string.max": "Password cannot exceed 64 characters",
         "string.pattern.base":
-          "Password must include uppercase, lowercase, number and special character (@$!%*?&)",
+          "Password must contain uppercase, lowercase, number and special character",
       }),
     userType: Joi.string().valid("creator", "viewer").default("viewer"),
     organizationName: Joi.string()
