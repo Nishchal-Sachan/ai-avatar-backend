@@ -10,7 +10,7 @@ const validateRegister = (req, res, next) => {
   if (password && password.length < 6) errors.push('Password must be at least 6 characters');
 
   if (errors.length > 0) {
-    return next(new AppError(errors.join('. '), 400));
+    return next(new AppError(errors.join('. '), 400, 'VALIDATION_ERROR'));
   }
   next();
 };
@@ -23,7 +23,7 @@ const validateLogin = (req, res, next) => {
   if (!password) errors.push('Password is required');
 
   if (errors.length > 0) {
-    return next(new AppError(errors.join('. '), 400));
+    return next(new AppError(errors.join('. '), 400, 'VALIDATION_ERROR'));
   }
   next();
 };

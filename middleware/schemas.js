@@ -1,7 +1,10 @@
 /**
  * Joi validation schemas.
+ * Used with validate() middleware: stripUnknown true, abortEarly false.
  */
 import Joi from "joi";
+
+const joiOptions = { stripUnknown: true, abortEarly: false };
 
 export const registerSchema = {
   body: Joi.object({
@@ -41,7 +44,7 @@ export const registerSchema = {
         }),
         otherwise: Joi.optional().strip(),
       }),
-  }),
+  }).options(joiOptions),
 };
 
 export const loginSchema = {
@@ -59,29 +62,30 @@ export const loginSchema = {
     password: Joi.string().required().messages({
       "string.empty": "Password is required",
     }),
-  }),
+  }).options(joiOptions),
 };
 
 export const askSchema = {
   body: Joi.object({
     text: Joi.string().trim().max(10000).optional().allow(""),
-
-    avatarId: Joi.string().trim().max(100).optional(),
-
+    avatarId: Joi.string().trim().min(1).max(100).required().messages({
+      "string.empty": "avatarId is required",
+      "any.required": "avatarId is required",
+    }),
     targetLanguage: Joi.string()
       .valid("en", "hi", "es", "fr")
       .default("en")
       .optional(),
-
     temperature: Joi.number().min(0).max(1).optional(),
-
     maxTokens: Joi.number().integer().min(1).max(4096).optional(),
-
     topK: Joi.number().integer().min(1).max(20).optional(),
-
     streamAudio: Joi.boolean().optional(),
-  }).optional(),
+  }),
 };
+
+const objectIdSchema = Joi.string().pattern(/^[0-9a-fA-F]{24}$/).messages({
+  "string.pattern.base": "Invalid ID format",
+});
 
 export const createAvatarSchema = {
   body: Joi.object({
@@ -105,6 +109,12 @@ export const createAvatarSchema = {
   }),
 };
 
+export const avatarIdParamSchema = {
+  params: Joi.object({
+    id: objectIdSchema.required(),
+  }),
+};
+
 export const updateAvatarSchema = {
   body: Joi.object({
     name: Joi.string().trim().min(3).max(100).optional().messages({
@@ -113,6 +123,37 @@ export const updateAvatarSchema = {
     persona: Joi.string().trim().max(1000).optional(),
     defaultLanguage: Joi.string().trim().max(20).optional(),
     voiceId: Joi.string().trim().max(100).optional(),
-    appearance: Joi.object().max(50).optional(),
+    appearance: Joi.object({
+      eyeColor: Joi.string().optional(),
+      skinTone: Joi.string().optional(),
+      hairStyle: Joi.string().optional(),
+      hairColor: Joi.string().optional(),
+      outfit: Joi.string().optional(),
+      accessories: Joi.array().items(Joi.string()).optional(),
+      height: Joi.number().optional(),
+    })
+      .max(50)
+      .optional(),
   }),
+};
+
+export const documentIdParamSchema = {
+  params: Joi.object({
+    id: objectIdSchema.required(),
+  }),
+};
+
+export const documentUploadSchema = {
+  body: Joi.object({
+    title: Joi.string().trim().min(1).max(200).required().messages({
+      "string.empty": "Title is required",
+      "string.min": "Title is required",
+    }),
+    avatarId: Joi.string()
+      .trim()
+      .pattern(/^[0-9a-fA-F]{24}$/)
+      .optional()
+      .allow("")
+      .messages({ "string.pattern.base": "Invalid avatar ID format" }),
+  }).options(joiOptions),
 };

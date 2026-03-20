@@ -1,14 +1,19 @@
 /**
- * Centralized error middleware.
- * Returns structured error response. Status code mapping:
- * 400 validation, 401 auth, 403 forbidden, 404 not found, 409 duplicate,
- * 415 unsupported media, 429 rate limit, 500 server error
+ * Global error middleware.
+ * Status code mapping:
+ * 400 → validation
+ * 401 → auth
+ * 403 → forbidden
+ * 404 → not found
+ * 500 → server error
+ *
+ * Response format: { success: false, error: { code, message } }
+ * Validation errors: NO stack traces.
+ * Only 500 errors: log stack.
  */
-import crypto from "crypto";
 import logger from "../config/logger.js";
 
-const errorHandler = (err, req, res, next) => {
-  const requestId = req.requestId || req.headers["x-request-id"] || crypto.randomUUID();
+const errorMiddleware = (err, req, res, next) => {
   let statusCode = err.statusCode || 500;
   let message = err.message || "Internal server error";
   let code = err.code || "INTERNAL_ERROR";
@@ -16,9 +21,12 @@ const errorHandler = (err, req, res, next) => {
   if (err.name === "ValidationError") {
     statusCode = 400;
     code = "VALIDATION_ERROR";
-    message = Object.values(err.errors)
-      .map((e) => e.message)
-      .join(". ");
+    message =
+      err.errors && typeof err.errors === "object"
+        ? Object.values(err.errors)
+          .map((e) => e.message)
+          .join(". ")
+        : err.message;
   } else if (err.name === "JsonWebTokenError") {
     statusCode = 401;
     code = "AUTH_INVALID";
@@ -35,7 +43,7 @@ const errorHandler = (err, req, res, next) => {
     statusCode = 400;
     code = "FILE_TOO_LARGE";
     message = "File size exceeds 5MB limit.";
-  } else if (err.code === "UNSUPPORTED_MEDIA" || (err.statusCode === 415)) {
+  } else if (err.code === "UNSUPPORTED_MEDIA" || err.statusCode === 415) {
     statusCode = 415;
     code = "UNSUPPORTED_MEDIA";
     message = err.message || "Unsupported media type. Only PDF is allowed.";
@@ -50,34 +58,31 @@ const errorHandler = (err, req, res, next) => {
     message = err.message;
     code = err.code || "AI_SERVICE_ERROR";
     if (err.statusCode) statusCode = err.statusCode;
+  } else if (err.code === "STT_FAILED") {
+    message = err.message;
+    code = "STT_FAILED";
+    statusCode = err.statusCode || 500;
   } else if (err.message === "CORS not allowed") {
     statusCode = 403;
     code = "CORS_DENIED";
     message = "CORS not allowed";
   }
 
-  const isClientError = statusCode >= 400 && statusCode < 500;
-
-  if (process.env.NODE_ENV === "production" && isClientError) {
-    delete err.stack;
-  }
+  const isValidationError = statusCode === 400 && code === "VALIDATION_ERROR";
 
   if (statusCode >= 500) {
-    console.error("Server Error:", err);
-    logger.error("Request error", {
+    logger.error("Server error", {
       message: err.message,
       statusCode,
       code,
-      requestId,
       path: req.path,
       stack: err.stack,
     });
-  } else {
-    logger.warn("Request completed with client error", {
+  } else if (!isValidationError) {
+    logger.warn("Client error", {
       message,
       statusCode,
       code,
-      requestId,
       path: req.path,
     });
   }
@@ -85,14 +90,12 @@ const errorHandler = (err, req, res, next) => {
   const response = {
     success: false,
     error: {
-      message,
       code,
-      requestId,
-      ...(process.env.NODE_ENV === "development" && !isClientError && { stack: err.stack }),
+      message,
     },
   };
 
   res.status(statusCode).json(response);
 };
 
-export default errorHandler;
+export default errorMiddleware;

@@ -3,11 +3,12 @@ import helmet from "helmet";
 import path from "path";
 import { fileURLToPath } from "url";
 import { corsMiddleware } from "./middleware/cors.js";
-import errorHandler from "./middleware/errorHandler.js";
+import errorMiddleware from "./middleware/error.middleware.js";
 import { apiLimiter } from "./middleware/rateLimit.js";
 import { requestId } from "./middleware/requestId.js";
 import { responseTime } from "./middleware/responseTime.js";
 import routes from "./routes/index.js";
+import AppError from "./utils/AppError.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,15 +33,20 @@ app.get("/", (req, res) => {
   });
 });
 
-app.use("/api/v1", apiLimiter, routes);
-
-app.use((req, res, next) => {
-  res.status(404).json({
-    success: false,
-    error: { message: `Not found - ${req.originalUrl}` },
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
   });
 });
 
-app.use(errorHandler);
+app.use("/api/v1", apiLimiter, routes);
+
+app.use((req, res, next) => {
+  next(new AppError(`Not found - ${req.originalUrl}`, 404, "NOT_FOUND"));
+});
+
+app.use(errorMiddleware);
 
 export default app;

@@ -1,26 +1,26 @@
 /**
  * Chunk text into 400-500 token segments with 50 token overlap.
- * Uses ~4 chars/token heuristic for English. Handles large text safely.
+ * Uses ~4 chars/token heuristic for English.
  */
 
 const CHARS_PER_TOKEN = 4;
-const TARGET_CHUNK_TOKENS = 450;
+const TARGET_CHUNK_TOKENS = 450; // Center of 400-500 range
 const OVERLAP_TOKENS = 50;
 
-const CHUNK_CHARS = TARGET_CHUNK_TOKENS * CHARS_PER_TOKEN;
-const OVERLAP_CHARS = OVERLAP_TOKENS * CHARS_PER_TOKEN;
-const STEP_CHARS = CHUNK_CHARS - OVERLAP_CHARS;
+const CHUNK_CHARS = TARGET_CHUNK_TOKENS * CHARS_PER_TOKEN; // 1800 chars
+const OVERLAP_CHARS = OVERLAP_TOKENS * CHARS_PER_TOKEN; // 200 chars
+const STEP_CHARS = CHUNK_CHARS - OVERLAP_CHARS; // 1600 chars per step
 
 const MAX_TEXT_LENGTH = 10 * 1024 * 1024; // 10MB safety limit
 
 /**
- * Split text into overlapping chunks of ~400-500 tokens.
- * @param {string} text - Input text (empty or very long text handled safely)
+ * Split text into overlapping chunks of ~400-500 tokens (50 token overlap).
+ * @param {string} text - Input text
  * @returns {string[]} Array of text chunks
  */
 export function chunkText(text) {
-  if (typeof text !== 'string') {
-    throw new TypeError('chunkText expects a string');
+  if (typeof text !== "string") {
+    throw new TypeError("chunkText expects a string");
   }
 
   const trimmed = text.trim();
@@ -40,7 +40,8 @@ export function chunkText(text) {
     let chunkEnd = end;
     const segment = trimmed.slice(start, end);
 
-    const lastSpace = segment.lastIndexOf(' ');
+    // Break at word boundary when possible (avoid mid-word cuts)
+    const lastSpace = segment.lastIndexOf(" ");
     if (lastSpace > CHUNK_CHARS * 0.5 && end < trimmed.length) {
       chunkEnd = start + lastSpace + 1;
     }
@@ -52,6 +53,7 @@ export function chunkText(text) {
 
     if (chunkEnd >= trimmed.length) break;
 
+    // Next start: step back by overlap to create 50-token overlap
     start = Math.max(0, chunkEnd - OVERLAP_CHARS);
   }
 

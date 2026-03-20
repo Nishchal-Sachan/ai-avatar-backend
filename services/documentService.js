@@ -10,7 +10,7 @@ import {
   generateEmbedding,
   storeEmbedding,
   deleteEmbeddingsByDocument,
-} from './embeddingService.js';
+} from "./embedding.service.js";
 
 function cleanupFile(filePath) {
   if (filePath && fs.existsSync(filePath)) {
@@ -56,9 +56,9 @@ export const uploadDocument = async ({ file, title, avatarId, userId }) => {
   const namespace = avatarId?.trim() || 'default';
 
   const document = await Document.create({
-    title: title?.trim() || file.originalname || 'Untitled',
+    title: title?.trim() || file.originalname || "Untitled",
     filePath: relativePath,
-    avatarId: avatarId?.trim() || undefined,
+    avatarId: avatarId?.trim() || null,
     uploadedBy: userId,
   });
 
@@ -66,7 +66,8 @@ export const uploadDocument = async ({ file, title, avatarId, userId }) => {
 
   if (text) {
     const chunks = chunkText(text);
-    console.log("Chunks stored in vector DB:", chunks.length);
+    logger.debug("RAG chunk count", { chunkCount: chunks.length, documentId, avatarId: namespace });
+    logger.info("Chunks stored in vector DB", { count: chunks.length });
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -92,14 +93,19 @@ export const uploadDocument = async ({ file, title, avatarId, userId }) => {
 };
 
 /**
- * Soft delete document by ID. Admin only. Does NOT delete file from disk.
+ * Soft delete document by ID. Only the uploader can delete.
  * @param {string} documentId
+ * @param {string} userId - Must match uploadedBy
  */
-export async function deleteDocument(documentId) {
+export async function deleteDocument(documentId, userId) {
   const document = await Document.findById(documentId);
 
   if (!document) {
-    throw new AppError('Document not found.', 404, 'DOCUMENT_NOT_FOUND');
+    throw new AppError("Document not found.", 404, "DOCUMENT_NOT_FOUND");
+  }
+
+  if (document.uploadedBy.toString() !== userId.toString()) {
+    throw new AppError("Only the uploader can delete this document.", 403, "ACCESS_DENIED");
   }
 
   document.isDeleted = true;
@@ -107,7 +113,7 @@ export async function deleteDocument(documentId) {
   await document.save();
 
   try {
-    const namespace = document.avatarId?.trim() || 'default';
+    const namespace = document.avatarId?.toString() || "default";
     await deleteEmbeddingsByDocument(documentId, { namespace });
     deleteChunksByDocument(documentId);
   } catch (err) {

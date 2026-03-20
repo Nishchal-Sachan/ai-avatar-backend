@@ -1,22 +1,36 @@
-import { Router } from 'express';
-import * as documentController from '../controllers/documentController.js';
-import { protect, authorizeUserType } from '../middleware/auth.js';
-import { uploadSingle } from '../middleware/upload.js';
+import { Router } from "express";
+import * as documentController from "../controllers/documentController.js";
+import { protect, authorizeUserType } from "../middleware/auth.middleware.js";
+import { uploadSingle } from "../middleware/upload.js";
+import { validate } from "../middleware/validate.js";
+import { documentUploadSchema, documentIdParamSchema } from "../middleware/schemas.js";
 
 const router = Router();
 
 /**
- * POST /documents/upload
- * Creator only. Only creators can upload knowledge documents.
- * Requires protect + authorizeUserType("creator").
+ * POST /documents
+ * Creator only. PDF only, max 5MB.
+ * Multipart: file (required), title (required), avatarId (optional)
  */
 router.post(
-  '/upload',
+  "/",
   protect,
-  authorizeUserType('creator'),
-  uploadSingle('file'),
+  authorizeUserType("creator"),
+  uploadSingle("file"),
+  validate(documentUploadSchema),
   documentController.upload
 );
-router.delete('/:id', protect, authorizeUserType('creator'), documentController.remove);
+
+/**
+ * DELETE /documents/:id
+ * Creator only. Only the uploader can delete.
+ */
+router.delete(
+  "/:id",
+  protect,
+  authorizeUserType("creator"),
+  validate(documentIdParamSchema),
+  documentController.remove
+);
 
 export default router;

@@ -1,10 +1,11 @@
 import { Router } from "express";
 import * as avatarController from "../controllers/avatarController.js";
-import { protect, authorizeUserType } from "../middleware/auth.js";
+import { protect, authorizeUserType } from "../middleware/auth.middleware.js";
 import { validate } from "../middleware/validate.js";
 import {
   createAvatarSchema,
   updateAvatarSchema,
+  avatarIdParamSchema,
 } from "../middleware/schemas.js";
 
 const router = Router();
@@ -35,6 +36,7 @@ router.patch(
   "/:id",
   protect,
   authorizeUserType("creator"),
+  validate(avatarIdParamSchema),
   validate(updateAvatarSchema),
   avatarController.update
 );
@@ -47,6 +49,7 @@ router.delete(
   "/:id",
   protect,
   authorizeUserType("creator"),
+  validate(avatarIdParamSchema),
   avatarController.remove
 );
 

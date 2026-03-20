@@ -1,4 +1,5 @@
 import * as authService from '../services/authService.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
 /**
  * Register a new user.
@@ -10,18 +11,14 @@ import * as authService from '../services/authService.js';
  * Request body: { name, email, password, userType, organizationName? }
  * Returns JWT token after successful registration.
  */
-export const register = async (req, res, next) => {
-  try {
-    const { user, token } = await authService.registerUser(req.body);
-    res.status(201).json({
-      success: true,
-      token,
-      user,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+export const register = asyncHandler(async (req, res) => {
+  const { user, token } = await authService.registerUser(req.body);
+  res.status(201).json({
+    success: true,
+    token,
+    user,
+  });
+});
 
 /**
  * Login user and return JWT.
@@ -29,16 +26,12 @@ export const register = async (req, res, next) => {
  *
  * Login does NOT assign roles. JWT payload includes id, userType, role, organizationName.
  */
-export const login = async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-    const { user, token } = await authService.loginUser(email, password);
-    res.status(200).json({
-      success: true,
-      token,
-      user,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+export const login = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  const { user, token } = await authService.loginUser(email, password);
+  res.status(200).json({
+    success: true,
+    token,
+    user,
+  });
+});

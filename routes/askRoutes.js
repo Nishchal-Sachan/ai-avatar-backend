@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as askController from '../controllers/askController.js';
-import { protect } from '../middleware/auth.js';
+import { protect } from '../middleware/auth.middleware.js';
 import { uploadAudioOptional } from '../middleware/upload.js';
 import { validate } from '../middleware/validate.js';
 import { askSchema } from '../middleware/schemas.js';

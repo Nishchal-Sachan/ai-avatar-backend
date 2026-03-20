@@ -1,8 +1,5 @@
-/**
- * Avatar service - create avatars (creator only), list avatars, validate ownership.
- */
-import Avatar from '../models/Avatar.js';
-import { AppError } from '../utils/AppError.js';
+import Avatar from "../models/Avatar.js";
+import AppError from "../utils/AppError.js";
 
 /**
  * List all avatars. Used by both creators and viewers for browsing.
@@ -13,9 +10,25 @@ export async function listAvatars() {
 
 /**
  * Create a new avatar.
+ * @param {Object} data - { name, persona?, defaultLanguage?, voiceId?, appearance?, createdBy }
+ * @throws {AppError} if name or createdBy missing
  */
 export async function createAvatar(data) {
-  return Avatar.create(data);
+  if (!data.name?.trim()) {
+    throw new AppError("Name is required", 400, "VALIDATION_ERROR");
+  }
+  if (!data.createdBy) {
+    throw new AppError("createdBy is required", 400, "VALIDATION_ERROR");
+  }
+
+  return Avatar.create({
+    name: data.name.trim(),
+    persona: data.persona?.trim(),
+    defaultLanguage: data.defaultLanguage?.trim(),
+    voiceId: data.voiceId?.trim(),
+    appearance: data.appearance && typeof data.appearance === "object" ? data.appearance : {},
+    createdBy: data.createdBy,
+  });
 }
 
 /**
@@ -65,13 +78,10 @@ export async function deleteAvatar(avatarId, userId) {
  * Validate document upload: only avatar creator (creator userType) can upload.
  * When avatarId provided: user must be the avatar creator.
  * When no avatarId: creator can upload (personal docs).
- * @param {string} [avatarId] - Avatar _id (optional)
- * @param {Object} user - { id, userType, role }
- * @throws {AppError} if not allowed
  */
 export async function validateDocumentUploadAccess(avatarId, user) {
-  if (user.userType !== 'creator') {
-    throw new AppError('Only creators can upload documents.', 403, 'ACCESS_DENIED');
+  if (user.userType !== "creator") {
+    throw new AppError("Only creators can upload documents.", 403, "ACCESS_DENIED");
   }
 
   if (!avatarId?.trim()) {
@@ -80,12 +90,16 @@ export async function validateDocumentUploadAccess(avatarId, user) {
 
   const avatar = await Avatar.findById(avatarId.trim());
   if (!avatar) {
-    throw new AppError('Avatar not found.', 404, 'AVATAR_NOT_FOUND');
+    throw new AppError("Avatar not found.", 404, "AVATAR_NOT_FOUND");
   }
 
   const isCreator = avatar.createdBy.toString() === user.id.toString();
 
   if (!isCreator) {
-    throw new AppError('Only the avatar creator can upload documents to this avatar.', 403, 'ACCESS_DENIED');
+    throw new AppError(
+      "Only the avatar creator can upload documents to this avatar.",
+      403,
+      "ACCESS_DENIED"
+    );
   }
 }

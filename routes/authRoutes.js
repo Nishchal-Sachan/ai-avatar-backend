@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as authController from '../controllers/authController.js';
-import { protect } from '../middleware/auth.js';
+import { protect } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.js';
 import { registerSchema, loginSchema } from '../middleware/schemas.js';
 
@@ -19,13 +19,13 @@ router.post('/register', validate(registerSchema), authController.register);
 
 /**
  * POST /auth/login
- * Returns JWT token. Payload includes id, userType, role, organizationName.
+ * Returns JWT token. Payload includes id, userType, role.
  */
 router.post('/login', validate(loginSchema), authController.login);
 
 /**
  * GET /auth/me
- * Returns current user from JWT (id, userType, role, organizationName).
+ * Returns current user from JWT (id, userType, role).
  */
 router.get('/me', protect, (req, res) => {
   res.json({

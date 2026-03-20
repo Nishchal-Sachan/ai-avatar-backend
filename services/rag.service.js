@@ -1,70 +1,46 @@
 /**
  * RAG service - Retrieval Augmented Generation.
- * Orchestrates: embed question → retrieve chunks → build context → LLM completion.
- * Handles retrieval; LLM handles completion only.
+ * Embed question → retrieve chunks (filter by avatarId) → build context → LLM completion.
+ * Prompt: system ("You are a district collector AI...") + user (context + question).
  */
 
-import { generateEmbedding, searchSimilar } from './embeddingService.js';
-import { getChunksByIds } from './embedding/chunkStore.js';
-import { getConversationHistory } from './conversationService.js';
-import { complete } from './llm.service.js';
-import logger from '../config/logger.js';
+import logger from "../config/logger.js";
+import AppError from "../utils/AppError.js";
+import { getConversationHistory } from "./conversationService.js";
+import { generateEmbedding, searchSimilar } from "./embedding.service.js";
+import { getChunksByIds } from "./embedding/chunkStore.js";
+import { complete } from "./llm.service.js";
 
 const DEFAULT_SYSTEM_PROMPT =
-  'You are a district collector AI avatar. Answer strictly from context.';
+  "You are a district collector AI avatar. Answer strictly from context.";
 
 const DEFAULT_TOP_K = 5;
 const DEFAULT_TEMPERATURE = 0.3;
 const DEFAULT_MAX_TOKENS = 1024;
 const CHARS_PER_TOKEN = 4;
 const MAX_CONTEXT_TOKENS = 6000;
-const NO_CHUNKS_FALLBACK = "I don't have enough information.";
+const NO_CHUNKS_ERROR =
+  "No relevant context found for this avatar. Please upload documents or ensure avatarId is correct.";
 
-/**
- * Estimate token count from character length.
- */
 function estimateTokens(text) {
   return Math.ceil((text?.length ?? 0) / CHARS_PER_TOKEN);
 }
 
-/**
- * Truncate text to fit within token limit.
- */
 function truncateToTokenLimit(text, maxTokens) {
   const maxChars = maxTokens * CHARS_PER_TOKEN;
   if ((text?.length ?? 0) <= maxChars) return text;
-  return text.slice(0, maxChars).trim() + '\n\n[Context truncated...]';
+  return text.slice(0, maxChars).trim() + "\n\n[Context truncated...]";
 }
 
 /**
- * @typedef {Object} RAGOptions
- * @property {number} [topK] - Number of chunks to retrieve (default 5)
- * @property {number} [temperature] - LLM temperature 0-1 (default 0.3)
- * @property {number} [maxTokens] - Max tokens for LLM response (default 1024)
- * @property {string} [systemPrompt] - Override default system prompt
- * @property {string} [avatarId] - Namespace for vector search (isolates per avatar)
- * @property {string} [userId] - For conversation memory (last 3 interactions)
- */
-
-/**
- * @typedef {Object} RAGResult
- * @property {string} answer
- * @property {string} finishReason
- * @property {number} usage
- * @property {number} chunksUsed
- * @property {number} [responseTimeMs]
- * @property {number} [totalTokens]
- */
-
-/**
- * Run RAG pipeline: embed → retrieve → context → LLM.
+ * Run RAG pipeline: embed → retrieve (filter by avatarId) → context → LLM.
  * @param {string} question - User question
- * @param {RAGOptions} [options]
- * @returns {Promise<RAGResult>}
+ * @param {Object} [options] - { topK=5, avatarId, userId, temperature, maxTokens, systemPrompt, preferGroq }
+ * @returns {Promise<Object>} { answer, chunksUsed, chunkCount, totalTokens, responseTimeMs, ... }
  */
 export async function ask(question, options = {}) {
   const start = performance.now();
-
+  logger.info("RAG INPUT QUESTION", { question });
   const {
     topK = DEFAULT_TOP_K,
     temperature = DEFAULT_TEMPERATURE,
@@ -72,19 +48,31 @@ export async function ask(question, options = {}) {
     systemPrompt = DEFAULT_SYSTEM_PROMPT,
     avatarId,
     userId,
+    preferGroq = false,
   } = options;
 
   if (!question?.trim()) {
-    throw new Error('Question is required');
+    throw new Error("Question is required");
   }
+
+  const namespace = avatarId || "default";
 
   const embedStart = performance.now();
   const queryVector = await generateEmbedding(question);
 
   const similar = await searchSimilar(queryVector, topK, {
-    namespace: avatarId || 'default',
+    namespace,
   });
-  console.log('Retrieved chunks:', similar.length);
+
+  logger.debug("RAG retrieved chunks", {
+    chunkCount: similar.length,
+    avatarId: namespace,
+    retrievedChunks: similar.map((s) => ({
+      id: s.id,
+      score: s.score?.toFixed(4),
+      hasText: Boolean(s.metadata?.text),
+    })),
+  });
 
   let chunks = similar
     .map((s) => {
@@ -99,33 +87,25 @@ export async function ask(question, options = {}) {
 
   const retrievalTimeMs = Math.round(performance.now() - embedStart);
 
+  // No chunks → throw proper error instead of silent fallback
   if (chunks.length === 0) {
-    const responseTimeMs = Math.round(performance.now() - start);
-    logger.info('RAG completed (no chunks)', {
-      chunksRetrieved: 0,
-      totalTokens: 0,
-      responseTimeMs,
-    });
-    return {
-      answer: NO_CHUNKS_FALLBACK,
-      finishReason: 'no_chunks',
-      usage: 0,
-      chunksUsed: 0,
-      chunkCount: 0,
-      responseTimeMs,
-      retrievalTimeMs,
-      llmTimeMs: 0,
-      totalTokens: 0,
-    };
+    logger.warn("RAG no chunks found", { avatarId: namespace });
+    throw new AppError(NO_CHUNKS_ERROR, 404, "NO_CONTEXT_FOUND");
   }
 
-  let contextBlock = chunks.map((c) => c.text).join('\n\n---\n\n');
+  logger.debug("RAG chunk count", {
+    chunkCount: chunks.length,
+    avatarId: namespace,
+  });
+
+  let contextBlock = chunks.map((c) => c.text).join("\n\n---\n\n");
   const contextTokens = estimateTokens(contextBlock);
 
   if (contextTokens > MAX_CONTEXT_TOKENS) {
     contextBlock = truncateToTokenLimit(contextBlock, MAX_CONTEXT_TOKENS);
   }
 
+  // Inject context and question into user message
   const userMessage = `Context:\n${contextBlock}\n\nQuestion: ${question.trim()}`;
 
   let conversationHistory = [];
@@ -133,25 +113,33 @@ export async function ask(question, options = {}) {
     try {
       conversationHistory = await getConversationHistory(userId, 3);
     } catch (err) {
-      logger.warn('Failed to load conversation history', { userId, error: err.message });
+      logger.warn("Failed to load conversation history", {
+        userId,
+        error: err.message,
+      });
     }
   }
 
   const llmStart = performance.now();
-  const result = await complete({
-    systemPrompt,
-    userMessage,
-    temperature,
-    maxTokens,
-    conversationHistory,
-  });
+  const result = await complete(
+    {
+      systemPrompt,
+      userMessage,
+      temperature,
+      maxTokens,
+      conversationHistory,
+    },
+    { preferGroq },
+  );
   const llmTimeMs = Math.round(performance.now() - llmStart);
 
   const responseTimeMs = Math.round(performance.now() - start);
-  const totalTokens = result.usage;
+  const totalTokens = result.usage ?? 0;
 
-  logger.info('RAG completed', {
+  logger.info("RAG completed", {
     chunksRetrieved: chunks.length,
+    chunkCount: chunks.length,
+    avatarId: namespace,
     totalTokens,
     responseTimeMs,
     retrievalTimeMs,

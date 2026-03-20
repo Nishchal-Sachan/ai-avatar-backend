@@ -1,6 +1,6 @@
 /**
- * Global async wrapper - prevents unhandled promise rejections in route handlers.
  * Wraps async route handlers and forwards errors to Express error middleware.
+ * Prevents unhandled promise rejections in controllers.
  *
  * @param {Function} fn - Async route handler (req, res, next) => Promise
  * @returns {Function} Express middleware
