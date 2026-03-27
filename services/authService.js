@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import AppError from "../utils/AppError.js";
 import { generateOTP, hashOTP } from "../utils/otp.util.js";
-import { sendOTPEmail } from "./email.service.js";
+import { sendOTPEmail, sendResetOtpEmail } from "./email.service.js";
 
 /**
  * Register a new user.
@@ -141,4 +141,98 @@ export const verifyOtp = async (userId, otp) => {
 
   await user.save({ validateBeforeSave: false });
   console.log(`User ${userId} successfully verified`);
+};
+
+export const sendResetOtp = async (email) => {
+  if (!email) throw new AppError("Email is required", 400, "VALIDATION_ERROR");
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+  if (!user) {
+    throw new AppError("User not found with this email", 404, "NOT_FOUND");
+  }
+
+  const otp = generateOTP();
+  const hashedOtp = hashOTP(otp);
+
+  console.log(`Reset OTP requested for user ${user._id}`);
+
+  user.resetOtp = hashedOtp;
+  user.resetOtpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); 
+
+  await user.save({ validateBeforeSave: false });
+
+  await sendResetOtpEmail(user.email, otp);
+};
+
+export const verifyResetOtp = async (email, otp) => {
+  if (!email || !otp || typeof otp !== "string" || otp.length !== 6) {
+    throw new AppError("Valid email and 6-digit OTP are required", 400, "VALIDATION_ERROR");
+  }
+
+  const user = await User.findOne({ email: email.toLowerCase() }).select("+resetOtp +resetOtpExpiresAt");
+  if (!user) {
+    throw new AppError("User not found", 404, "NOT_FOUND");
+  }
+
+  if (!user.resetOtp || !user.resetOtpExpiresAt) {
+    throw new AppError("No reset OTP requested", 400, "NO_OTP");
+  }
+
+  if (new Date() > user.resetOtpExpiresAt) {
+    throw new AppError("Expired OTP", 400, "EXPIRED_OTP");
+  }
+
+  const hashedOtp = hashOTP(otp);
+  if (user.resetOtp !== hashedOtp) {
+    console.log(`Failed reset OTP verification attempt for user ${user._id}`);
+    throw new AppError("Invalid OTP", 400, "INVALID_OTP");
+  }
+
+  // OTP verified, clear it out.
+  user.resetOtp = undefined;
+  user.resetOtpExpiresAt = undefined;
+  await user.save({ validateBeforeSave: false });
+
+  console.log(`User ${user._id} successfully verified reset OTP`);
+
+  const resetToken = jwt.sign(
+    {
+      id: user._id,
+      type: "password_reset",
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" }
+  );
+
+  return resetToken;
+};
+
+export const resetPassword = async (resetToken, newPassword) => {
+  if (!resetToken) {
+    throw new AppError("Reset token is required", 400, "VALIDATION_ERROR");
+  }
+  if (!newPassword || newPassword.length < 8) {
+    throw new AppError("Password must be at least 8 characters", 400, "VALIDATION_ERROR");
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+  } catch (err) {
+    throw new AppError("Invalid or expired reset token", 400, "INVALID_TOKEN");
+  }
+
+  if (decoded.type !== "password_reset") {
+    throw new AppError("Invalid token type", 400, "INVALID_TOKEN");
+  }
+
+  const user = await User.findById(decoded.id).select("+password");
+  if (!user) {
+    throw new AppError("User not found", 404, "NOT_FOUND");
+  }
+  
+  user.password = newPassword;
+  await user.save(); 
+  
+  console.log(`Password reset successful for user ${user._id}`);
 };

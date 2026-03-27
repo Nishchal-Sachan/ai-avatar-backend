@@ -60,3 +60,43 @@ export const verifyOtp = asyncHandler(async (req, res) => {
     message: "Account verified",
   });
 });
+
+/**
+ * Request password reset OTP
+ * POST /api/v1/auth/forgot-password
+ */
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  await authService.sendResetOtp(email);
+  res.status(200).json({
+    success: true,
+    message: "OTP sent to email",
+  });
+});
+
+/**
+ * Verify reset OTP
+ * POST /api/v1/auth/verify-reset-otp
+ */
+export const verifyResetOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  const resetToken = await authService.verifyResetOtp(email, otp);
+  res.status(200).json({
+    success: true,
+    message: "OTP verified",
+    resetToken,
+  });
+});
+
+/**
+ * Reset password
+ * POST /api/v1/auth/reset-password
+ */
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { resetToken, newPassword } = req.body;
+  await authService.resetPassword(resetToken, newPassword);
+  res.status(200).json({
+    success: true,
+    message: "Password reset successful",
+  });
+});

@@ -60,6 +60,13 @@ const userSchema = new mongoose.Schema(
     otpExpires: {
       type: Date,
     },
+    resetOtp: {
+      type: String,
+      select: false,
+    },
+    resetOtpExpiresAt: {
+      type: Date,
+    },
     role: {
       type: String,
       enum: {
