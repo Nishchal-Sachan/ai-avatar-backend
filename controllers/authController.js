@@ -35,3 +35,28 @@ export const login = asyncHandler(async (req, res) => {
     user,
   });
 });
+
+/**
+ * Send OTP for creator verification
+ * POST /api/v1/auth/send-otp
+ */
+export const sendOtp = asyncHandler(async (req, res) => {
+  await authService.sendOtp(req.user.id);
+  res.status(200).json({
+    success: true,
+    message: "OTP sent to email",
+  });
+});
+
+/**
+ * Verify OTP for creator verification
+ * POST /api/v1/auth/verify-otp
+ */
+export const verifyOtp = asyncHandler(async (req, res) => {
+  const { otp } = req.body;
+  await authService.verifyOtp(req.user.id, otp);
+  res.status(200).json({
+    success: true,
+    message: "Account verified",
+  });
+});

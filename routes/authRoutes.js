@@ -34,4 +34,16 @@ router.get('/me', protect, (req, res) => {
   });
 });
 
+/**
+ * POST /auth/send-otp
+ * Generates and sends OTP to creator email
+ */
+router.post('/send-otp', protect, authController.sendOtp);
+
+/**
+ * POST /auth/verify-otp
+ * Verifies the OTP sent to creator email
+ */
+router.post('/verify-otp', protect, authController.verifyOtp);
+
 export default router;

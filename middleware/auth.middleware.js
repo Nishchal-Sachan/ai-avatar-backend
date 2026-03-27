@@ -85,3 +85,27 @@ export const authorizeRoles = (...roles) => (req, res, next) => {
 
   next();
 };
+
+/**
+ * Require user to be a verified creator
+ */
+export const requireVerifiedCreator = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return next(new AppError("Missing token", 401, "AUTH_REQUIRED"));
+    }
+
+    if (req.user.userType !== "creator") {
+      return next(new AppError("Access denied, must be creator", 403, "ACCESS_DENIED"));
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user || !user.isVerified) {
+      return next(new AppError("Account not verified", 403, "NOT_VERIFIED"));
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};

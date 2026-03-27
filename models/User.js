@@ -49,6 +49,17 @@ const userSchema = new mongoose.Schema(
         message: 'Organization name is required when user type is creator',
       },
     },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    otp: {
+      type: String,
+      select: false,
+    },
+    otpExpires: {
+      type: Date,
+    },
     role: {
       type: String,
       enum: {
